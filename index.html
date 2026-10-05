@@ -389,6 +389,8 @@
         errorBox.style.display = 'none';
     }
 
+    const API_BASE = (window.location.protocol === 'file:' || !window.location.origin.includes(':8000')) ? 'http://localhost:8000' : '';
+
     // Início do processamento
     startBtn.addEventListener('click', async () => {
         if (!selectedFile) return;
@@ -408,7 +410,7 @@
         formData.append('model_size', modelSelect.value);
 
         try {
-            const response = await fetch('/api/transcribe', {
+            const response = await fetch(`${API_BASE}/api/transcribe`, {
                 method: 'POST',
                 body: formData
             });
@@ -425,7 +427,11 @@
             pollJobStatus(jobId);
 
         } catch (err) {
-            showError(err.message);
+            if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+                showError('Não foi possível conectar ao servidor local. Certifique-se de executar no PowerShell o comando: uvicorn server:app --reload --port 8000');
+            } else {
+                showError(err.message);
+            }
             startBtn.disabled = false;
         }
     });
@@ -435,7 +441,7 @@
 
         pollInterval = setInterval(async () => {
             try {
-                const response = await fetch(`/api/jobs/${jobId}`);
+                const response = await fetch(`${API_BASE}/api/jobs/${jobId}`);
                 if (!response.ok) {
                     throw new Error('Falha ao consultar status da tarefa.');
                 }
