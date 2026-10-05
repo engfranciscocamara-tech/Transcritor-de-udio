@@ -1,0 +1,19 @@
+# Arquivos em cache do Python
+__pycache__/
+*.pyc
+
+# Arquivos de áudio (para não encher o repositório com arquivos pesados)
+*.mp3
+*.wav
+*.m4a
+*.ogg
+*.aac
+
+# Executáveis locais
+bin/
+
+# Variáveis de ambiente
+.env
+
+# Arquivos temporários do sistema
+.DS_Store

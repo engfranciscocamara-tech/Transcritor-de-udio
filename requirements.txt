@@ -1,0 +1,8 @@
+streamlit
+openai-whisper
+noisereduce
+google-genai
+soundfile
+pydub
+scipy
+librosa
