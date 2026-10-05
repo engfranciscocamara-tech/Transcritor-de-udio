@@ -59,23 +59,35 @@ GEMINI_API_KEY=sua_chave_aqui
 
 ## Como Executar
 
-Inicie a aplicação com o comando:
+O projeto disponibiliza duas formas de execução:
 
+### 1. Interface Web Dedicada (HTML + FastAPI)
+
+Inicie o servidor web:
+```bash
+uvicorn server:app --reload --port 8000
+```
+Abra o navegador no endereço: **`http://localhost:8000`**
+
+### 2. Interface Streamlit
+
+Caso prefira a interface do Streamlit:
 ```bash
 streamlit run app.py
 ```
-
-O navegador abrirá automaticamente no endereço local `http://localhost:8501`.
+Abra o navegador no endereço: **`http://localhost:8501`**
 
 ---
 
 ## Estrutura do Projeto
 
 ```text
-├── app.py               # Interface Streamlit e fluxo da aplicação
-├── audio_processor.py   # Conversão de áudio e redução de ruído em chunks
-├── transcriber.py       # Integração com faster-whisper e callback de progresso
-├── summarizer.py        # Chamada ao Google Gemini para geração da ata
+├── index.html           # Interface web em HTML/CSS/JavaScript
+├── server.py            # Servidor FastAPI com endpoints de upload e status
+├── app.py               # Interface Streamlit alternativa
+├── audio_processor.py   # Conversão de áudio e redução de ruído em blocos
+├── transcriber.py       # Integração com faster-whisper e progresso real
+├── summarizer.py        # Geração de ata via Google Gemini
 ├── requirements.txt     # Dependências Python do projeto
 └── README.md            # Documentação de uso
 ```
