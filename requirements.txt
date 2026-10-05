@@ -1,8 +1,8 @@
 streamlit
-openai-whisper
+faster-whisper
 noisereduce
 google-genai
 soundfile
-pydub
 scipy
-librosa
+imageio-ffmpeg
+numpy
