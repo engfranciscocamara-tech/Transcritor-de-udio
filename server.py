@@ -44,12 +44,19 @@ def get_index():
 
 def run_transcription_job(job_id: str, temp_input_path: str, model_size: str, language: str):
     clean_audio_path = None
+    is_cancelled = lambda: jobs.get(job_id, {}).get("cancelled", False)
     try:
+        if is_cancelled():
+            raise RuntimeError("Processamento cancelado pelo usuário.")
+
         # Etapa 1: Limpeza de ruído
         jobs[job_id]["progress"] = 10
         jobs[job_id]["message"] = "Etapa 1/3: Limpando áudio e reduzindo ruído... [10%]"
-        clean_audio_path = process_audio(temp_input_path)
+        clean_audio_path = process_audio(temp_input_path, is_cancelled=is_cancelled)
         
+        if is_cancelled():
+            raise RuntimeError("Processamento cancelado pelo usuário.")
+
         # Etapa 2: Transcrição com faster-whisper
         jobs[job_id]["progress"] = 40
         jobs[job_id]["message"] = f"Etapa 2/3: Transcrevendo com modelo '{model_size}'... [40%]"
@@ -63,8 +70,12 @@ def run_transcription_job(job_id: str, temp_input_path: str, model_size: str, la
             clean_audio_path,
             model_size=model_size,
             language=language,
-            progress_callback=on_progress
+            progress_callback=on_progress,
+            is_cancelled=is_cancelled
         )
+
+        if is_cancelled():
+            raise RuntimeError("Processamento cancelado pelo usuário.")
 
         if not transcript:
             raise RuntimeError("A transcrição retornou um texto vazio.")
@@ -74,6 +85,9 @@ def run_transcription_job(job_id: str, temp_input_path: str, model_size: str, la
         jobs[job_id]["message"] = "Etapa 3/3: Gerando ata com a Inteligência Artificial... [90%]"
         minutes = generate_minutes(transcript, GEMINI_API_KEY)
 
+        if is_cancelled():
+            raise RuntimeError("Processamento cancelado pelo usuário.")
+
         # Conclusão
         jobs[job_id]["progress"] = 100
         jobs[job_id]["message"] = "Processamento concluído com sucesso! [100%]"
@@ -82,9 +96,13 @@ def run_transcription_job(job_id: str, temp_input_path: str, model_size: str, la
         jobs[job_id]["minutes"] = minutes
 
     except Exception as e:
-        jobs[job_id]["status"] = "failed"
-        jobs[job_id]["error"] = str(e)
-        jobs[job_id]["message"] = f"Erro no processamento: {str(e)}"
+        if is_cancelled():
+            jobs[job_id]["status"] = "cancelled"
+            jobs[job_id]["message"] = "Processamento cancelado pelo usuário."
+        else:
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = str(e)
+            jobs[job_id]["message"] = f"Erro no processamento: {str(e)}"
     finally:
         if os.path.exists(temp_input_path):
             try:
@@ -116,7 +134,8 @@ async def start_transcription(
         "message": "Arquivo recebido. Iniciando processamento... [5%]",
         "transcript": None,
         "minutes": None,
-        "error": None
+        "error": None,
+        "cancelled": False
     }
 
     thread = threading.Thread(
@@ -127,6 +146,15 @@ async def start_transcription(
     thread.start()
 
     return {"job_id": job_id}
+
+@app.post("/api/jobs/{job_id}/cancel")
+def cancel_job(job_id: str):
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+    jobs[job_id]["cancelled"] = True
+    jobs[job_id]["status"] = "cancelled"
+    jobs[job_id]["message"] = "Processamento cancelado pelo usuário."
+    return {"status": "cancelled", "job_id": job_id}
 
 @app.get("/api/jobs/{job_id}")
 def get_job_status(job_id: str):

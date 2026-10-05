@@ -1,10 +1,11 @@
 import time
 from faster_whisper import WhisperModel
 
-def transcribe_audio(file_path: str, model_size: str = "base", language: str = "pt", progress_callback=None) -> str:
+def transcribe_audio(file_path: str, model_size: str = "base", language: str = "pt", progress_callback=None, is_cancelled=None) -> str:
     """
     Carrega o modelo Whisper (via faster-whisper) e transcreve o arquivo de áudio.
-    Permite passar uma função progress_callback(percentage) para rastrear o progresso real.
+    Permite passar uma função progress_callback(percentage) para rastrear o progresso real
+    e uma função is_cancelled() para interromper a execução imediatamente.
     """
     print(f"Carregando modelo faster-whisper ({model_size})...")
     # Usa int8 na CPU para ser bem mais rápido e economizar RAM
@@ -20,6 +21,9 @@ def transcribe_audio(file_path: str, model_size: str = "base", language: str = "
     text_chunks = []
     
     for segment in segments:
+        if is_cancelled and is_cancelled():
+            raise RuntimeError("Processamento cancelado pelo usuário.")
+
         text_chunks.append(segment.text)
         
         # O faster-whisper processa em tempo real. 'segment.end' diz em qual segundo do áudio ele está.

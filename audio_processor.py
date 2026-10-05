@@ -4,7 +4,7 @@ import numpy as np
 import soundfile as sf
 import noisereduce as nr
 
-def process_audio(file_path: str) -> str:
+def process_audio(file_path: str, is_cancelled=None) -> str:
     """
     Carrega o arquivo de áudio, converte para 16kHz mono (ideal para Whisper)
     e aplica redução de ruído em pedaços (chunks) para economizar memória.
@@ -24,6 +24,11 @@ def process_audio(file_path: str) -> str:
     cmd = [ffmpeg_exe, "-y", "-i", file_path, "-ac", "1", "-ar", "16000", temp_wav]
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
+    if is_cancelled and is_cancelled():
+        if os.path.exists(temp_wav):
+            os.remove(temp_wav)
+        raise RuntimeError("Processamento cancelado pelo usuário.")
+
     # 3. Ler o áudio como array numpy (usando soundfile)
     y, sr = sf.read(temp_wav)
     
@@ -37,6 +42,10 @@ def process_audio(file_path: str) -> str:
     cleaned_y = np.zeros_like(y)
     
     for i in range(0, len(y), chunk_size):
+        if is_cancelled and is_cancelled():
+            if os.path.exists(temp_wav):
+                os.remove(temp_wav)
+            raise RuntimeError("Processamento cancelado pelo usuário.")
         end = min(i + chunk_size, len(y))
         chunk = y[i:end]
         

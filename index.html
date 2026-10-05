@@ -126,8 +126,14 @@
             word-break: break-all;
         }
 
-        button.btn-primary {
+        .actions-row {
+            display: flex;
+            gap: 0.8rem;
             width: 100%;
+        }
+
+        button.btn-primary {
+            flex: 1;
             padding: 0.8rem;
             background-color: var(--accent-color);
             color: #ffffff;
@@ -141,6 +147,23 @@
 
         button.btn-primary:hover:not(:disabled) {
             background-color: var(--accent-hover);
+        }
+
+        button.btn-cancel {
+            padding: 0.8rem 1.5rem;
+            background-color: transparent;
+            color: #f85149;
+            border: 1px solid var(--danger-color);
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        button.btn-cancel:hover:not(:disabled) {
+            background-color: var(--danger-color);
+            color: #ffffff;
         }
 
         button:disabled {
@@ -300,7 +323,10 @@
             <div class="selected-file-info" id="fileInfo"></div>
         </div>
 
-        <button class="btn-primary" id="startBtn" disabled>Iniciar Processamento</button>
+        <div class="actions-row">
+            <button class="btn-primary" id="startBtn" disabled>Iniciar Processamento</button>
+            <button class="btn-cancel" id="cancelBtn" style="display: none;">Cancelar</button>
+        </div>
 
         <div class="alert-error" id="errorBox"></div>
 
@@ -337,6 +363,7 @@
     const audioFileInput = document.getElementById('audioFileInput');
     const fileInfo = document.getElementById('fileInfo');
     const startBtn = document.getElementById('startBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
     const languageSelect = document.getElementById('languageSelect');
     const modelSelect = document.getElementById('modelSelect');
 
@@ -354,6 +381,7 @@
 
     let selectedFile = null;
     let pollInterval = null;
+    let currentJobId = null;
 
     // Seleção de arquivo
     dropArea.addEventListener('click', () => audioFileInput.click());
@@ -391,11 +419,44 @@
 
     const API_BASE = (window.location.protocol === 'file:' || !window.location.origin.includes(':8000')) ? 'http://localhost:8000' : '';
 
+    function resetButtons() {
+        startBtn.style.display = 'block';
+        startBtn.disabled = false;
+        cancelBtn.style.display = 'none';
+        cancelBtn.disabled = false;
+        cancelBtn.textContent = 'Cancelar';
+    }
+
+    // Cancelar processamento
+    cancelBtn.addEventListener('click', async () => {
+        if (!currentJobId) return;
+
+        cancelBtn.disabled = true;
+        cancelBtn.textContent = 'Cancelando...';
+        statusMessage.textContent = 'Cancelando processamento...';
+
+        try {
+            await fetch(`${API_BASE}/api/jobs/${currentJobId}/cancel`, {
+                method: 'POST'
+            });
+        } catch (e) {
+            console.error(e);
+        }
+
+        if (pollInterval) clearInterval(pollInterval);
+        statusMessage.textContent = 'Processamento cancelado pelo usuário.';
+        resetButtons();
+    });
+
     // Início do processamento
     startBtn.addEventListener('click', async () => {
         if (!selectedFile) return;
 
-        startBtn.disabled = true;
+        startBtn.style.display = 'none';
+        cancelBtn.style.display = 'block';
+        cancelBtn.disabled = false;
+        cancelBtn.textContent = 'Cancelar';
+
         errorBox.style.display = 'none';
         resultsSection.style.display = 'none';
         progressSection.style.display = 'block';
@@ -421,10 +482,10 @@
             }
 
             const data = await response.json();
-            const jobId = data.job_id;
+            currentJobId = data.job_id;
 
             // Iniciar monitoramento
-            pollJobStatus(jobId);
+            pollJobStatus(currentJobId);
 
         } catch (err) {
             if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
@@ -432,7 +493,7 @@
             } else {
                 showError(err.message);
             }
-            startBtn.disabled = false;
+            resetButtons();
         }
     });
 
@@ -457,22 +518,26 @@
                 if (job.status === 'completed') {
                     clearInterval(pollInterval);
                     finishJob(job);
+                } else if (job.status === 'cancelled') {
+                    clearInterval(pollInterval);
+                    statusMessage.textContent = 'Processamento cancelado pelo usuário.';
+                    resetButtons();
                 } else if (job.status === 'failed') {
                     clearInterval(pollInterval);
                     showError(job.error || 'Ocorreu um erro no processamento.');
-                    startBtn.disabled = false;
+                    resetButtons();
                 }
 
             } catch (err) {
                 clearInterval(pollInterval);
                 showError(err.message);
-                startBtn.disabled = false;
+                resetButtons();
             }
         }, 1000);
     }
 
     function finishJob(job) {
-        startBtn.disabled = false;
+        resetButtons();
         resultsSection.style.display = 'block';
 
         transcriptOutput.textContent = job.transcript || 'Transcrição vazia.';
